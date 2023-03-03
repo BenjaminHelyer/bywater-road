@@ -1,0 +1,19 @@
+version: "3.9"
+services:
+  server:
+    container_name: bywater_server_container
+    build: ./server
+    ports:
+      - "8000:5000" # port mapping - local machine's port : container's port
+    volumes:
+      - ./server:/bywater_server_code
+    environment:
+      FLASK_DEBUG: True
+  mysqldb:
+    image: mysql:latest
+    ports:
+      - "3306:3306" # mySQL runs by default on port 3306
+    volumes:
+      - ./bywater_db_volume:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: p@ssw0rd1

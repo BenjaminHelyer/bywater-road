@@ -38,28 +38,6 @@ def get_widgets():
 
     return json.dumps(json_data)
 
-# @app.route('/addcols')
-# def add_cols():
-#     mydb = mysql.connector.connect(
-#         host="mysqldb",
-#         user="root",
-#         password="p@ssw0rd1",
-#         database="inventory"
-#     )
-#     cursor = mydb.cursor()
-
-#     query = "ALTER TABLE widgets \
-# ADD widgetName VARCHAR(100)"
-#     # Execute the query 
-#     cursor.execute(query)
-
-#     query = "ALTER TABLE widgets \
-# ADD widgetCount INT"
-#     # Execute the query 
-#     cursor.execute(query)
-
-#     return 'added cols'
-
 @app.route('/addwidgets')
 def add_widgets():
     mydb = mysql.connector.connect(
@@ -126,19 +104,45 @@ def load_annotations():
 def load_image_file(annotations_df):
     """Generator to load the image files."""
     img_base_path = "C:\\Users\\Benjamin\\Downloads\\archive\\daySequence1\\daySequence1\\frames"
-    for filename in annotations_df['Filename'][:10]: # TODO: do this will all files later, need to find a way not to handle this large amount of data well
+    # TODO: ensure this is compute + memory efficient later
+    for index, row in annotations_df.iterrows():
+        filename = row["Filename"]
+        upper_left_x = row["Upper left corner X"]
+        lower_right_x = row["Lower right corner X"]
+        upper_left_y = row["Upper left corner Y"]
+        lower_right_y = row["Lower right corner Y"]
         if filename[:8] == 'dayTest/':
             actual_name = filename[8:]
             img_full_path = img_base_path + "\\" + actual_name
             img = cv2.imread(img_full_path)
-            yield img
+            yield img, upper_left_x, lower_right_x, upper_left_y, lower_right_y
         else:
             raise NotImplementedError
-        yield img
 
-def crop_img(img, x1, x2, y1, y2):
+def crop_img(img, upper_left_x, lower_right_x, upper_left_y, lower_right_y):
     """Crop the image, returning the subset of the image corresponding to a box determined by 2 coordinates."""
-    raise NotImplementedError
+    cropped_img = img[upper_left_y:lower_right_y, upper_left_x:lower_right_x]
+    return cropped_img
+
+# TODO: consider using sampling here, to make this more performant, especially if we run this on an edge device at any point
+def average_colors(img):
+    """Averages all of the colors in the image given as an OpenCV object. Returns a tuple of R, G, and B values."""
+    num_pixels = 0
+    r_avg = 0
+    g_avg = 0
+    b_avg = 0
+    for row in img:
+        for pixel in row:
+            r_avg = get_tot_avg(r_avg, num_pixels, pixel[0])
+            g_avg = get_tot_avg(g_avg, num_pixels, pixel[1])
+            b_avg = get_tot_avg(b_avg, num_pixels, pixel[2])
+            num_pixels += 1
+    return (r_avg, g_avg, b_avg)
+
+def get_tot_avg(prev_tot, prev_n, new_num):
+    """Gets the total average after a new number is added to the series."""
+    tot_avg = ((prev_tot)*(prev_n - 1) + new_num)/(prev_n + 1)
+    return tot_avg
 
 @app.route('/preprocess')
 def preprocess():
@@ -155,8 +159,10 @@ def preprocess():
     """
     annotations_df = load_annotations()
     imgs = []
-    for img in load_image_file(annotations_df):
-        imgs += [img]
+    for img, upper_left_x, lower_right_x, upper_left_y, lower_right_y in load_image_file(annotations_df[:10]): # TODO: make this do it on more images once we optimize that function
+        traffic_light_subimage = crop_img(img, upper_left_x, lower_right_x, upper_left_y, lower_right_y)
+        rgb_avg = average_colors(traffic_light_subimage)
+        imgs += [rgb_avg]
 
     return 'preprocessing data' + str(imgs)
 

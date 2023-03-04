@@ -2,8 +2,11 @@ import mysql.connector
 from flask import Flask
 import pandas as pd
 import cv2 as cv2
+import numpy as np
 
 import json
+
+from BywaterImgConnect.img_connector import ImgConnector
 
 # TODO: figure out what's wrong with this connection class
 # **May just be an out of order initialization, just try restarting the app
@@ -98,13 +101,15 @@ def db_init():
 
 def load_annotations():
     """Loads the annotations in a Pandas dataframe."""
-    annotation_path = "C:\\Users\\Benjamin\\Documents\\GitHub\\bywater-road\\local_data\\frameAnnotationsBOX.csv"
-    annotations_df = pd.read_csv(annotation_path, sep = ';')
+    myConnector = ImgConnector()
+    annotation_path = 'archive/Annotations/Annotations/daySequence1/frameAnnotationsBOX.csv'
+    annotations_df = myConnector.get_annotations_from_s3(annotation_path)
     return annotations_df
 
 def load_image_file(annotations_df):
     """Generator to load the image files."""
-    img_base_path = "C:\\Users\\Benjamin\\Downloads\\archive\\daySequence1\\daySequence1\\frames"
+    myConnector = ImgConnector()
+    img_base_path = "archive/daySequence1/daySequence1/frames/"
     # TODO: ensure this is compute + memory efficient later
     for index, row in annotations_df.iterrows():
         filename = row["Filename"]
@@ -114,8 +119,8 @@ def load_image_file(annotations_df):
         lower_right_y = row["Lower right corner Y"]
         if filename[:8] == 'dayTest/':
             actual_name = filename[8:]
-            img_full_path = img_base_path + "\\" + actual_name
-            img = cv2.imread(img_full_path)
+            object_name = img_base_path + actual_name
+            img = myConnector.get_img_from_s3(object_name)
             yield img, upper_left_x, lower_right_x, upper_left_y, lower_right_y
         else:
             raise NotImplementedError

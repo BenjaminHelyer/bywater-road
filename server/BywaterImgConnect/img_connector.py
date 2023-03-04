@@ -9,6 +9,8 @@ import io
 import boto3
 import numpy as np
 from PIL import Image
+import cv2 as cv2
+import pandas as pd
 
 class ImgConnector:
     """Class for connecting to the image storage and retrieving images."""
@@ -27,25 +29,40 @@ class ImgConnector:
         access_key = config['aws_access_key_id']
         secret_key = config['aws_secret_access_key']
         return access_key, secret_key
-
-    def get_img_from_s3(self, object_name, file_name):
-        """Retrieves an image from the S3 bucket."""
+    
+    def _get_object_from_s3(self, object_name):
+        """Retrieves an object from the S3 bucket and returns it as a byte stream."""
         s3_client = boto3.client(
             's3',
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key
         )
         response = s3_client.get_object(Bucket=self.s3_bucket_name, Key=object_name)
-        image_data = response['Body'].read()
-        image_buffer = io.BytesIO(image_data)
-        image = Image.open(image_buffer)
-        return image
+        data = response['Body'].read()
+        buffer = io.BytesIO(data)
+        return buffer
+
+    def get_img_from_s3(self, object_name):
+        """Retrieves an image from the S3 bucket."""
+        img_buffer = self._get_object_from_s3(object_name)
+        # TODO: make this cleaner, try not to have to convert from PIL to OpenCV if possible. Try to just stream to OpenCV.
+        pil_img = Image.open(img_buffer)
+        opencvImage = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        return opencvImage
+    
+    def get_annotations_from_s3(self, object_name):
+        """Retrieves an annotation file as a pandas dataframe from the S3 bucket."""
+        annotation_buffer = self._get_object_from_s3(object_name)
+        annotation_df = pd.read_csv(annotation_buffer, sep = ';')
+        return annotation_df
 
 if __name__ == '__main__':
     print("Trying to get an image from S3")
     myConnector = ImgConnector()
 
-    img1 = myConnector.get_img_from_s3('archive/daySequence1/daySequence1/frames/daySequence1--00000.jpg', 
-                                        'daySequence1--00000.jpg')
-    img1.show()
+    # img1 = myConnector.get_img_from_s3('archive/daySequence1/daySequence1/frames/daySequence1--00000.jpg')
+    # img1.show()
+
+    annotations1 = myConnector.get_annotations_from_s3('archive/Annotations/Annotations/daySequence1/frameAnnotationsBOX.csv')
+    print(annotations1)
         

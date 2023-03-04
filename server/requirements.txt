@@ -3,3 +3,4 @@ mysql-connector-python
 pandas
 opencv-python
 boto3
+pillow

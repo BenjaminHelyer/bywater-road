@@ -5,6 +5,7 @@ Currently implemented with AWS S3.
 
 import json
 import io
+import os
 
 import boto3
 import numpy as np
@@ -23,11 +24,29 @@ class ImgConnector:
         self.s3_bucket_name = s3_bucket_name
 
     def get_access_keys(self):
+        """Retrieves the access keys."""
+        try:
+            access_key, secret_key = self.get_local_keys()
+        except:
+            try:
+                access_key, secret_key = self.get_environment_variable_keys()
+            except:
+                print("Tried to get access keys and faile. Exiting.")
+                return None, None
+        return access_key, secret_key
+    
+    def get_local_keys(self):
         """Retrieves the access keys for local use."""
         with open(self.access_filepath, 'r') as f:
             config = json.load(f)
         access_key = config['aws_access_key_id']
         secret_key = config['aws_secret_access_key']
+        return access_key, secret_key
+    
+    def get_environment_variable_keys():
+        """Retrieves the access keys from environment variables."""
+        access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+        secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         return access_key, secret_key
     
     def _get_object_from_s3(self, object_name):

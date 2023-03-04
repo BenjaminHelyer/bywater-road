@@ -1,8 +1,9 @@
 import mysql.connector
-import json
 from flask import Flask
 import pandas as pd
 import cv2 as cv2
+
+import json
 
 # TODO: figure out what's wrong with this connection class
 # **May just be an out of order initialization, just try restarting the app

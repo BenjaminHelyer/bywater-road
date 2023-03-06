@@ -31,7 +31,8 @@ class ImgConnector:
             try:
                 access_key, secret_key = self.get_environment_variable_keys()
             except:
-                print("Tried to get access keys and faile. Exiting.")
+                # TODO: implement a better exception here once we're done prototyping locally
+                print("Tried to get access keys and failed. Exiting.")
                 return None, None
         return access_key, secret_key
     
@@ -74,14 +75,4 @@ class ImgConnector:
         annotation_buffer = self._get_object_from_s3(object_name)
         annotation_df = pd.read_csv(annotation_buffer, sep = ';')
         return annotation_df
-
-if __name__ == '__main__':
-    print("Trying to get an image from S3")
-    myConnector = ImgConnector()
-
-    # img1 = myConnector.get_img_from_s3('archive/daySequence1/daySequence1/frames/daySequence1--00000.jpg')
-    # img1.show()
-
-    annotations1 = myConnector.get_annotations_from_s3('archive/Annotations/Annotations/daySequence1/frameAnnotationsBOX.csv')
-    print(annotations1)
         

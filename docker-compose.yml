@@ -9,6 +9,8 @@ services:
       - ./server:/bywater_server_code
     environment:
       FLASK_DEBUG: True
+    env_file:
+      "../../AWS/bywater-road/bywater.env"
   mysqldb:
     image: mysql:latest
     ports:

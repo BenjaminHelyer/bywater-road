@@ -8,96 +8,47 @@ import json
 
 from BywaterImgConnect.img_connector import ImgConnector
 
-# TODO: figure out what's wrong with this connection class
-# **May just be an out of order initialization, just try restarting the app
-# after it fails once, when we try this connection class again
-# from connection import InventoryDb
-
 app = Flask(__name__)
 
 @app.route('/')
 def hello_world():
     return 'Hello, Docker!'
 
-@app.route('/widgets')
-def get_widgets():
-    mydb = mysql.connector.connect(
-        host="mysqldb",
-        user="root",
-        password="p@ssw0rd1",
-        database="inventory"
-    )
-    cursor = mydb.cursor()
+def insert_preprocessed_img_to_db(filename, 
+                                  tag, 
+                                  r_avg, 
+                                  g_avg, 
+                                  b_avg, 
+                                  db_name = 'bywater_road', 
+                                  table_name = 'traffic_lights'):
+    """Inserts the preprocessed image into the database."""
+    try:
+        # TODO: do the below the right way with user/pw
+        img_db = mysql.connector.connect(
+            host="mysqldb",
+            user="root",
+            password="p@ssw0rd1",
+            database=db_name
+        )
+    except mysql.connector.Error as e:
+        return "Connection error: " + str(e)
+    cursor = img_db.cursor()
 
-    cursor.execute("SELECT * FROM widgets")
+    insert_query = f"INSERT INTO {table_name}" \
+                    "(Filename, Tag, r_avg, g_avg, b_avg)" \
+                    "VALUES (%s, %s, %s, %s, %s);"
+    insert_data = (filename, tag, r_avg, g_avg, b_avg)
 
-    row_headers=[x[0] for x in cursor.description] #this will extract row headers
-
-    results = cursor.fetchall()
-    json_data=[]
-    for result in results:
-        json_data.append(dict(zip(row_headers,result)))
-
+    try:
+        cursor.execute(insert_query, insert_data)
+    except mysql.connector.Error as e:
+        return "Insertion error: " + str(e)
+    
+    img_db.commit()
     cursor.close()
+    img_db.close()
 
-    return json.dumps(json_data)
-
-@app.route('/addwidgets')
-def add_widgets():
-    mydb = mysql.connector.connect(
-        host="mysqldb",
-        user="root",
-        password="p@ssw0rd1",
-        database="inventory"
-    )
-    cursor = mydb.cursor()
-
-    query = "INSERT INTO widgets \
-(name, description) \
-VALUES ('boxes', 'these are some boxes')"
-    # Execute the query 
-    cursor.execute(query)
-
-    query = "INSERT INTO widgets \
-(name, description) \
-VALUES ('tables', 'nice tables')"
-    # Execute the query 
-    cursor.execute(query)
-
-    query = "INSERT INTO widgets \
-(name, description) \
-VALUES ('bags', 'plastic bags')"
-    # Execute the query 
-    cursor.execute(query)
-
-    return 'added widgets'
-
-@app.route('/initdb')
-def db_init():
-    mydb = mysql.connector.connect(
-        host="mysqldb",
-        user="root",
-        password="p@ssw0rd1"
-    )
-    cursor = mydb.cursor()
-
-    cursor.execute("DROP DATABASE IF EXISTS inventory")
-    cursor.execute("CREATE DATABASE inventory")
-    cursor.close()
-
-    mydb = mysql.connector.connect(
-        host="mysqldb",
-        user="root",
-        password="p@ssw0rd1",
-        database="inventory"
-    )
-    cursor = mydb.cursor()
-
-    cursor.execute("DROP TABLE IF EXISTS widgets")
-    cursor.execute("CREATE TABLE widgets (name VARCHAR(255), description VARCHAR(255))")
-    cursor.close()
-
-    return 'init database'
+    return 'success!'
 
 def load_annotations():
     """Loads the annotations in a Pandas dataframe."""
@@ -113,6 +64,7 @@ def load_image_file(annotations_df):
     # TODO: ensure this is compute + memory efficient later
     for index, row in annotations_df.iterrows():
         filename = row["Filename"]
+        tag = row["Annotation tag"]
         upper_left_x = row["Upper left corner X"]
         lower_right_x = row["Lower right corner X"]
         upper_left_y = row["Upper left corner Y"]
@@ -121,7 +73,7 @@ def load_image_file(annotations_df):
             actual_name = filename[8:]
             object_name = img_base_path + actual_name
             img = myConnector.get_img_from_s3(object_name)
-            yield img, upper_left_x, lower_right_x, upper_left_y, lower_right_y
+            yield img, upper_left_x, lower_right_x, upper_left_y, lower_right_y, filename, tag
         else:
             raise NotImplementedError
 
@@ -164,13 +116,12 @@ def preprocess():
         - Able to query database for some particular filename and see the correct values read back
     """
     annotations_df = load_annotations()
-    imgs = []
-    for img, upper_left_x, lower_right_x, upper_left_y, lower_right_y in load_image_file(annotations_df[:10]): # TODO: make this do it on more images once we optimize that function
+    for img, upper_left_x, lower_right_x, upper_left_y, lower_right_y, filename, tag in load_image_file(annotations_df[:10]): # TODO: make this do it on more images once we optimize that function
         traffic_light_subimage = crop_img(img, upper_left_x, lower_right_x, upper_left_y, lower_right_y)
         rgb_avg = average_colors(traffic_light_subimage)
-        imgs += [rgb_avg]
+        db_errs = insert_preprocessed_img_to_db(filename, tag, rgb_avg[0], rgb_avg[1], rgb_avg[2])
 
-    return 'preprocessing data' + str(imgs)
+    return 'done preprocessing data' + str(db_errs)
 
 if __name__ == "__main__":
     app.run(host ='0.0.0.0')

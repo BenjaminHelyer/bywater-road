@@ -121,7 +121,7 @@ def preprocess():
         rgb_avg = average_colors(traffic_light_subimage)
         db_errs = insert_preprocessed_img_to_db(filename, tag, rgb_avg[0], rgb_avg[1], rgb_avg[2])
 
-    return 'done preprocessing data' + str(db_errs)
+    return 'done preprocessing data: ' + str(db_errs)
 
 if __name__ == "__main__":
     app.run(host ='0.0.0.0')

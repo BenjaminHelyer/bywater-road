@@ -34,6 +34,7 @@ def insert_preprocessed_img_to_db(filename,
         return "Connection error: " + str(e)
     cursor = img_db.cursor()
 
+    # TODO: ensure we're not inserting data twice into the table. Find good ways to do this.
     insert_query = f"INSERT INTO {table_name}" \
                     "(Filename, Tag, r_avg, g_avg, b_avg)" \
                     "VALUES (%s, %s, %s, %s, %s);"
